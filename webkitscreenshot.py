@@ -49,7 +49,7 @@ def screenshot(url, **args):
     - font_monospace: monospace font
     - size: tuple (width, height) as image size. fullscreen if None
 
-    - return: pixbuf object
+    - return: gdk.Pixbuf object
     """
     return _WebKitScreenShot(url, **args).pixbuf
 
