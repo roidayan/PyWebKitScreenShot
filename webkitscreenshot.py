@@ -31,6 +31,7 @@ Changes:
             Fixed capturing height of document
             Default is capturing the entire document
             PIL is only used to create thumbnail from capture
+            Fixed cmdline font option
             Other changes
 """
 
@@ -239,6 +240,8 @@ def _main():
     thumbfile = opts.output
     timeout = opts.timeout
     thumbsize = opts.size
+    font = opts.font
+
     url = args[0]
     if not url.startswith('http'):
         url = 'file://' + url
