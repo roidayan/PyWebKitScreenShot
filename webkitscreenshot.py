@@ -86,11 +86,15 @@ class _WebKitScreenShot(object):
                  font_monospace=DEFAULT_FONT,
                  size=None,
                  timeout=3000):
-        import gtk
-        import webkit
-        import gobject
-
         self.pixbuf = None
+        self.timeout = False
+        try:
+            import gtk
+            import webkit
+            import gobject
+        except Exception as e:
+            print 'Failed import: %s' % str(e)
+            return
 
         gtk.gdk.threads_init()
 
@@ -132,6 +136,7 @@ class _WebKitScreenShot(object):
 
     def _timeout(self):
         print 'timeout'
+        self.timeout = True
         self.webview.stop_loading()
         return False
 
@@ -144,6 +149,9 @@ class _WebKitScreenShot(object):
 
     def _loaded(self, view, frame):
         import gtk
+        if self.timeout:
+            gtk.main_quit()
+            return
         try:
             width, height = self.size
             height = min(height, self._getHeight())
