@@ -123,7 +123,7 @@ class _WebKitScreenShot(object):
         webview.load_uri(url)
         window.show_all()
 
-        gobject.timeout_add(timeout, self._timeout)
+        self.timeout_tag = gobject.timeout_add(timeout, self._timeout)
         
         self.size = size
         self.window = window
@@ -149,9 +149,9 @@ class _WebKitScreenShot(object):
 
     def _loaded(self, view, frame):
         import gtk
-        if self.timeout:
-            gtk.main_quit()
-            return
+        import gobject
+        if not self.timeout:
+            gobject.source_remove(self.timeout_tag)
         try:
             width, height = self.size
             height = min(height, self._getHeight())
