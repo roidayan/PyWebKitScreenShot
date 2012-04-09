@@ -185,6 +185,8 @@ class _WebKitScreenShot(object):
                 #import traceback
                 #traceback.print_exc()
                 pass
+        self.webview.destroy()
+        self.window.destroy()
         gtk.main_quit()
 
 
