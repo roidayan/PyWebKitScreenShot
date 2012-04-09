@@ -72,7 +72,7 @@ def screenshot_vfb(url, **args):
         if proc:
             import os
             print 'Terminate vfb %d' % proc.pid
-            #proc.terminate()
+            proc.terminate()
             os.environ.pop('DISPLAY')
 
 
