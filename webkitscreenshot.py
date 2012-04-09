@@ -65,12 +65,15 @@ def screenshot_vfb(url, **args):
     if not display:
         print 'Error creating display'
         return None
-    print proc, display
+    print proc, proc.pid, display
     try:
         return screenshot(url, **args)
     finally:
         if proc:
-            proc.terminate()
+            import os
+            print 'Terminate vfb %d' % proc.pid
+            #proc.terminate()
+            os.environ.pop('DISPLAY')
 
 
 class _WebKitScreenShot(object):
@@ -169,7 +172,7 @@ class _WebKitScreenShot(object):
             pass
         gtk.main_quit()
 
-def vfb(display_spec='1024x768x24', server=0, screen=0, auto_screen=True):
+def vfb(display_spec='1024x768x24', server=99, screen=0, auto_screen=True):
     """
     run Xvfb and set DISPLAY env
     
@@ -184,16 +187,16 @@ def vfb(display_spec='1024x768x24', server=0, screen=0, auto_screen=True):
     import os
     #if os.environ.get('DISPLAY', None):
     #    return (None, os.environ['DISPLAY'])
-    retries = 3
-    while True:
+    devnull = open('/dev/null', 'w')
+    proc = None
+    env = ''
+    for i in range(3):
         try:
-            devnull = open('/dev/null', 'w')
             proc = subprocess.Popen(
                 ['Xvfb', ':%d' % server,
-                 '-screen', `screen`, display_spec],
+                 '-screen', `screen`, display_spec,
+                 '-nolisten', 'tcp'],
                 shell=False, stdout=devnull, stderr=devnull)
-            os.environ['DISPLAY'] = ':%d.%d' % (server, screen)
-            return (proc, os.environ['DISPLAY'])
         except Exception as e:
             print 'Error: %s' % str(e)
             #import traceback
@@ -201,10 +204,11 @@ def vfb(display_spec='1024x768x24', server=0, screen=0, auto_screen=True):
             if not auto_screen:
                 break
             screen += 1
-            retries -= 1
-            if retries <= 0:
-                break
-    return (None, '')
+        else:
+            env = ':%d.%d' % (server, screen)
+            os.environ['DISPLAY'] = env
+            break
+    return (proc, env)
 
 def thumbnail(pixbuf, thumbsize=(200, 150)):
     """
