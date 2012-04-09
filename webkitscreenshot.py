@@ -6,7 +6,7 @@ Modified by Roi Dayan
 
 command usage:
   python webkitscreenshot.py test.html
-  python webkitscreenshot.py -s 200x150 -t 6000 test.html
+  python webkitscreenshot.py -s 200,150 -t 6000 test.html
 
 library usage:
   import webkitscreenshot
@@ -27,6 +27,11 @@ required tools and resouces:
 - VLGothic: as default truetype font
 
 Changes:
+2012-04-09  Changed vfb() to class Xvfb
+            Handle more exceptions
+            Added log prints
+            Waiting for defunct Xvfb procs
+            Checking if X display is busy from lock files
 2012-04-07  Added timeout
             Fixed capturing height of document
             Default is capturing the entire document
@@ -35,9 +40,18 @@ Changes:
             Other changes
 """
 
+import os
+import sys
+import subprocess
 
 DEFAULT_FONT='VLGothic'
 
+
+def _ps_xvfb():
+    print '-- ps --'
+    proc = subprocess.Popen('ps -ef|grep -i xvfb|grep -v grep', shell=True)
+    proc.wait()
+    print '-- -- --'
 
 def screenshot(url, **args):
     """
@@ -56,24 +70,23 @@ def screenshot(url, **args):
 
 def screenshot_vfb(url, **args):
     """
+    runs Xvfb
     get screenshot in Xvfb
+    close Xvfb
     - same parameters and results as screenshot()
     - size: (1024, 768) as default
     """
     size = args.pop('size', (1024, 768))
-    proc, display = vfb(display_spec='%dx%dx24' % size)
-    if not display:
+    vfb = Xvfb(display_spec='%dx%dx24' % size)
+    if not vfb.display:
         print 'Error creating display'
         return None
-    print proc, proc.pid, display
+    print 'Xvfb: %d %s' % (vfb.proc.pid, vfb.display)
     try:
         return screenshot(url, **args)
     finally:
-        if proc:
-            import os
-            print 'Terminate vfb %d' % proc.pid
-            proc.terminate()
-            os.environ.pop('DISPLAY')
+        print 'Terminate vfb %d' % vfb.proc.pid
+        vfb.close()
 
 
 class _WebKitScreenShot(object):
@@ -155,60 +168,92 @@ class _WebKitScreenShot(object):
         import gobject
         if not self.timeout:
             gobject.source_remove(self.timeout_tag)
-        try:
-            width, height = self.size
-            height = min(height, self._getHeight())
-            print 'Get pixbuf size:%d,%d' % (width, height)
-            # see: http://www.pygtk.org/docs/pygtk/class-gdkpixbuf.html
-            pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,
-                                    False, 8, width, height)
-            pixbuf.get_from_drawable(view.window, view.window.get_colormap(),
-                                     0, 0, 0, 0, width, height)
-            self.pixbuf = pixbuf
-        except Exception as e:
-            print 'Failed pixbuf: %s' % str(e)
-            #import traceback
-            #traceback.print_exc()
-            pass
+        width, height = self.size
+        height = min(height, self._getHeight())
+        self.pixbuf_size = (width, height)
+        print 'Get pixbuf size:%d,%d' % (width, height)
+        if height > 0:
+            try:
+                # see: http://www.pygtk.org/docs/pygtk/class-gdkpixbuf.html
+                pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,
+                                        False, 8, width, height)
+                pixbuf.get_from_drawable(view.window, view.window.get_colormap(),
+                                         0, 0, 0, 0, width, height)
+                self.pixbuf = pixbuf
+            except Exception as e:
+                print 'Failed pixbuf: %s' % str(e)
+                #import traceback
+                #traceback.print_exc()
+                pass
         gtk.main_quit()
 
-def vfb(display_spec='1024x768x24', server=99, screen=0, auto_screen=True):
+
+class Xvfb(object):
     """
-    run Xvfb and set DISPLAY env
-    
+    Xvfb display
     usage:
-      proc, display = xvf()
+      vfb = Xvfb()
       import gtk
       ...
-      if proc:
-          proc.terminate()
+      vfb.close()
     """
-    import subprocess
-    import os
-    #if os.environ.get('DISPLAY', None):
-    #    return (None, os.environ['DISPLAY'])
-    devnull = open('/dev/null', 'w')
-    proc = None
-    env = ''
-    for i in range(3):
-        try:
-            proc = subprocess.Popen(
-                ['Xvfb', ':%d' % server,
-                 '-screen', `screen`, display_spec,
-                 '-nolisten', 'tcp'],
-                shell=False, stdout=devnull, stderr=devnull)
-        except Exception as e:
-            print 'Error: %s' % str(e)
-            #import traceback
-            #traceback.print_exc()
-            if not auto_screen:
-                break
-            screen += 1
-        else:
-            env = ':%d.%d' % (server, screen)
-            os.environ['DISPLAY'] = env
+
+    def __init__(self, display_spec='1024x768x24', display=99, screen=0):
+        """
+        run Xvfb and set DISPLAY env
+        """
+        #if os.environ.get('DISPLAY', None):
+        #    return (None, os.environ['DISPLAY'])
+        devnull = open(os.devnull, 'w')
+        display = self.find_free_display(display)
+        print 'use display: %d' % display
+        if display:
+            try:
+                proc = subprocess.Popen(
+                    ['Xvfb', ':%d' % display,
+                     '-screen', `screen`, display_spec,
+                     '-nolisten', 'tcp'],
+                    shell=False, stdout=devnull, stderr=devnull)
+            except Exception as e:
+                print 'Error: %s' % str(e)
+            else:
+                display = ':%d.%d' % (display, screen)
+                os.environ['DISPLAY'] = display
+        self.proc = proc
+        self.display = display
+        _ps_xvfb()
+
+    def close(self):
+        """
+        close Xvfb and unset display
+        """
+        if self.proc:
+            self.proc.terminate();
+            self.proc.wait()
+            self.proc = None
+            os.environ.pop('DISPLAY')
+
+    def find_free_display(self, display=99):
+        ret = None
+        for i in range(3):
+            print 'Try :%d' % display
+            lockfile = '/tmp/.X%d-lock' % display
+            if os.path.isfile(lockfile):
+                try:
+                    f = open(lockfile)
+                    pid = int(f.readline().strip())
+                    f.close()
+                except:
+                    continue
+                else:
+                    if os.path.exists('/proc/%d' % pid):
+                        print 'X :%d is busy' % display
+                        display += 1
+                        continue
+            ret = display
             break
-    return (proc, env)
+        return ret
+
 
 def thumbnail(pixbuf, thumbsize=(200, 150)):
     """
@@ -246,7 +291,6 @@ def _main():
     opts, args = parser.parse_args()
     if len(args) == 0:
         parser.print_help()
-        import sys
         sys.exit(-1)
 
     thumbfile = opts.output
@@ -262,6 +306,14 @@ def _main():
         vfbsize = (1024, 3000)
     else:
         vfbsize = (1024, 768)
+        try:
+            thumbsize = tuple(map(int, thumbsize.split(',')))
+        except:
+            thumbsize = ''
+        if len(thumbsize) != 2:
+            print 'Bad thumbsize'
+            sys.exit(-1)
+
     pixbuf = screenshot_vfb(url, size=vfbsize, timeout=timeout,
                            font_default=font, font_sans_serif=font,
                            font_serif=font, font_monospace=font)
@@ -269,14 +321,10 @@ def _main():
         if not thumbsize:
             pixbuf.save(thumbfile, 'png')
         else:
-            thumbsize = tuple(map(int, thumbsize.split(',')))
-            if len(thumbsize ) < 2:
-                print 'Error size'
-            else:
-                print 'Thumbnail: %s' % str(thumbsize)
-                image = thumbnail(pixbuf, thumbsize)
-                image.save(thumbfile)
-                del image
+            print 'Thumbnail: %s' % str(thumbsize)
+            image = thumbnail(pixbuf, thumbsize)
+            image.save(thumbfile)
+            del image
         del pixbuf
     print 'Done'
 
