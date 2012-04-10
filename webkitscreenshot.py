@@ -43,6 +43,8 @@ Changes:
 import os
 import sys
 import subprocess
+import tempfile
+
 
 DEFAULT_FONT='VLGothic'
 
@@ -206,23 +208,29 @@ class Xvfb(object):
         """
         #if os.environ.get('DISPLAY', None):
         #    return (None, os.environ['DISPLAY'])
-        devnull = open(os.devnull, 'w')
+        self.fbdir = None
+        self.proc = None
+        self.display = None
         display = self.find_free_display(display)
         print 'use display: %d' % display
         if display:
+            devnull = open(os.devnull, 'w')
+            fbdir = tempfile.mkdtemp()
             try:
                 proc = subprocess.Popen(
                     ['Xvfb', ':%d' % display,
                      '-screen', `screen`, display_spec,
+                     '-fbdir', fbdir,
                      '-nolisten', 'tcp'],
                     shell=False, stdout=devnull, stderr=devnull)
             except Exception as e:
+                os.rmdir(fbdir)
                 print 'Error: %s' % str(e)
             else:
-                display = ':%d.%d' % (display, screen)
-                os.environ['DISPLAY'] = display
-        self.proc = proc
-        self.display = display
+                self.display = ':%d.%d' % (display, screen)
+                os.environ['DISPLAY'] = self.display
+                self.fbdir = fbdir
+                self.proc = proc
         _ps_xvfb()
 
     def close(self):
@@ -230,10 +238,13 @@ class Xvfb(object):
         close Xvfb and unset display
         """
         if self.proc:
-            self.proc.terminate();
+            self.proc.terminate()
             self.proc.wait()
             self.proc = None
             os.environ.pop('DISPLAY')
+        if self.fbdir:
+            os.rmdir(self.fbdir)
+            self.fbdir = None
 
     def find_free_display(self, display=99):
         ret = None
