@@ -29,6 +29,7 @@ required tools and resouces:
 Changes:
 2012-04-12  Not getting document height when choosing size.
               This is to avoid stretching of the image.
+            Option to use an already running X server.
 2012-04-09  Changed vfb() to class Xvfb
             Handle more exceptions
             Added log prints
@@ -250,25 +251,29 @@ class Xvfb(object):
             os.rmdir(self.fbdir)
             self.fbdir = None
 
+    @staticmethod
+    def is_display_free(display):
+        free = True
+        lockfile = '/tmp/.X%d-lock' % display
+        if os.path.isfile(lockfile):
+            try:
+                f = open(lockfile)
+                pid = int(f.readline().strip())
+                f.close()
+            except:
+                free = False
+            else:
+                if os.path.exists('/proc/%d' % pid):
+                    free = False
+        return free
+
     def find_free_display(self, display=99):
         ret = None
         for i in range(3):
             print 'Try :%d' % display
-            lockfile = '/tmp/.X%d-lock' % display
-            if os.path.isfile(lockfile):
-                try:
-                    f = open(lockfile)
-                    pid = int(f.readline().strip())
-                    f.close()
-                except:
-                    continue
-                else:
-                    if os.path.exists('/proc/%d' % pid):
-                        print 'X :%d is busy' % display
-                        display += 1
-                        continue
-            ret = display
-            break
+            if self.is_display_free(display):
+                ret = display
+                break
         return ret
 
 
@@ -304,6 +309,9 @@ def _main():
     parser.add_option('-t', '--timeout', dest='timeout', type='int',
                       help='default timeout: %s' % timeout,
                       default=timeout)
+    parser.add_option('-p', '--display', dest='display', action='store_true',
+                      help='Use environment display.',
+                      default=False)
 
     opts, args = parser.parse_args()
     if len(args) == 0:
@@ -314,6 +322,15 @@ def _main():
     timeout = opts.timeout
     thumbsize = opts.size
     font = opts.font
+    if opts.display:
+        display = os.environ.get('DISPLAY', False)
+        if not display:
+            print 'Missing display.'
+            sys.exit(-1)
+        display = int(display.split(':')[1].split('.')[0])
+        if Xvfb.is_display_free(display):
+            print 'Display %s is not available.' % display
+            sys.exit(-1)
 
     url = args[0]
     if not url.startswith('http'):
@@ -331,10 +348,22 @@ def _main():
             print 'Bad thumbsize'
             sys.exit(-1)
 
-    pixbuf = screenshot_vfb(url, size=vfbsize, auto_height=(not thumbsize),
-                            timeout=timeout,
-                            font_default=font, font_sans_serif=font,
-                            font_serif=font, font_monospace=font)
+    args = {
+            'url': url,
+            'size': vfbsize,
+            'auto_height': (not thumbsize),
+            'timeout': timeout,
+            'font_default': font,
+            'font_sans_serif': font,
+            'font_serif': font,
+            'font_monospace': font
+           }
+
+    if not display:
+        pixbuf = screenshot_vfb(**args)
+    else:
+        pixbuf = screenshot(**args)
+
     if pixbuf:
         if not thumbsize:
             pixbuf.save(thumbfile, 'png')
