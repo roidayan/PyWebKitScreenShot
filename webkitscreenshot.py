@@ -27,6 +27,8 @@ required tools and resouces:
 - VLGothic: as default truetype font
 
 Changes:
+2012-04-12  Not getting document height when choosing size.
+              This is to avoid stretching of the image.
 2012-04-09  Changed vfb() to class Xvfb
             Handle more exceptions
             Added log prints
@@ -103,7 +105,9 @@ class _WebKitScreenShot(object):
                  font_sans_serif=DEFAULT_FONT,
                  font_monospace=DEFAULT_FONT,
                  size=None,
+                 auto_height=True,
                  timeout=3000):
+        self.auto_height=auto_height
         self.pixbuf = None
         self.timeout = False
         try:
@@ -114,6 +118,7 @@ class _WebKitScreenShot(object):
             print 'Failed import: %s' % str(e)
             return
 
+        self.timeout_tag = gobject.timeout_add(timeout, self._timeout)
         gtk.gdk.threads_init()
 
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -141,8 +146,6 @@ class _WebKitScreenShot(object):
         webview.load_uri(url)
         window.show_all()
 
-        self.timeout_tag = gobject.timeout_add(timeout, self._timeout)
-        
         self.size = size
         self.window = window
         self.webview = webview
@@ -171,9 +174,10 @@ class _WebKitScreenShot(object):
         if not self.timeout:
             gobject.source_remove(self.timeout_tag)
         width, height = self.size
-        height = min(height, self._getHeight())
+        if self.auto_height:
+            height = min(height, self._getHeight())
         self.pixbuf_size = (width, height)
-        print 'Get pixbuf size:%d,%d' % (width, height)
+        print 'Get pixbuf size:%d,%d' % self.pixbuf_size
         if height > 0:
             try:
                 # see: http://www.pygtk.org/docs/pygtk/class-gdkpixbuf.html
@@ -327,9 +331,10 @@ def _main():
             print 'Bad thumbsize'
             sys.exit(-1)
 
-    pixbuf = screenshot_vfb(url, size=vfbsize, timeout=timeout,
-                           font_default=font, font_sans_serif=font,
-                           font_serif=font, font_monospace=font)
+    pixbuf = screenshot_vfb(url, size=vfbsize, auto_height=(not thumbsize),
+                            timeout=timeout,
+                            font_default=font, font_sans_serif=font,
+                            font_serif=font, font_monospace=font)
     if pixbuf:
         if not thumbsize:
             pixbuf.save(thumbfile, 'png')
