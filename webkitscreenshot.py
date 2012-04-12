@@ -359,7 +359,7 @@ def _main():
             'font_monospace': font
            }
 
-    if not display:
+    if not opts.display:
         pixbuf = screenshot_vfb(**args)
     else:
         pixbuf = screenshot(**args)
