@@ -217,7 +217,6 @@ class Xvfb(object):
         self.proc = None
         self.display = None
         display = self.find_free_display(display)
-        print 'use display: %d' % display
         if display:
             devnull = open(os.devnull, 'w')
             fbdir = tempfile.mkdtemp()
@@ -274,6 +273,7 @@ class Xvfb(object):
             if self.is_display_free(display):
                 ret = display
                 break
+            display += 1
         return ret
 
 
