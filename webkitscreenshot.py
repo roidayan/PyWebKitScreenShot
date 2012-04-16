@@ -248,7 +248,7 @@ class Xvfb(object):
             self.proc.terminate()
             self.proc.wait()
             self.proc = None
-            os.environ.pop('DISPLAY')
+            del os.environ['DISPLAY']
         if self.fbdir:
             os.rmdir(self.fbdir)
             self.fbdir = None
