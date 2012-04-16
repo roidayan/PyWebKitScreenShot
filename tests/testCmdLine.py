@@ -6,6 +6,7 @@ import time
 import os
 import tempfile
 
+
 def spawn(args):
     print 'cmd: %s' % ' '.join(args)
     devnull = open(os.devnull, 'w')
@@ -22,7 +23,7 @@ def spawn(args):
 
 class TestCmdLine(unittest.TestCase):
     def setUp(self):
-        self.assertNotEqual(os.environ.has_key('CMDPATH'), False)
+        self.assertNotEqual('CMDPATH' in os.environ, False)
         self.cmd = [os.environ['CMDPATH'] + '/webkitscreenshot.py']
         self.target = 'www.google.com'
 

@@ -49,7 +49,7 @@ import subprocess
 import tempfile
 
 
-DEFAULT_FONT='VLGothic'
+DEFAULT_FONT = 'VLGothic'
 
 
 def _ps_xvfb():
@@ -57,6 +57,7 @@ def _ps_xvfb():
     proc = subprocess.Popen('ps -ef|grep -i xvfb|grep -v grep', shell=True)
     proc.wait()
     print '-- -- --'
+
 
 def screenshot(url, **args):
     """
@@ -72,6 +73,7 @@ def screenshot(url, **args):
     - return: gdk.Pixbuf object
     """
     return _WebKitScreenShot(url, **args).pixbuf
+
 
 def screenshot_vfb(url, **args):
     """
@@ -108,7 +110,7 @@ class _WebKitScreenShot(object):
                  size=None,
                  auto_height=True,
                  timeout=3000):
-        self.auto_height=auto_height
+        self.auto_height = auto_height
         self.pixbuf = None
         self.timeout = False
         try:
@@ -184,7 +186,8 @@ class _WebKitScreenShot(object):
                 # see: http://www.pygtk.org/docs/pygtk/class-gdkpixbuf.html
                 pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,
                                         False, 8, width, height)
-                pixbuf.get_from_drawable(view.window, view.window.get_colormap(),
+                pixbuf.get_from_drawable(view.window,
+                                         view.window.get_colormap(),
                                          0, 0, 0, 0, width, height)
                 self.pixbuf = pixbuf
             except Exception as e:
@@ -223,7 +226,7 @@ class Xvfb(object):
             try:
                 proc = subprocess.Popen(
                     ['Xvfb', ':%d' % display,
-                     '-screen', `screen`, display_spec,
+                     '-screen', str(screen), display_spec,
                      '-fbdir', fbdir,
                      '-nolisten', 'tcp'],
                     shell=False, stdout=devnull, stderr=devnull)
@@ -287,6 +290,7 @@ def thumbnail(pixbuf, thumbsize=(200, 150)):
                              pixbuf.get_pixels())
     image.thumbnail(thumbsize, Image.ANTIALIAS)
     return image
+
 
 def _main():
     thumbsize = 'all'

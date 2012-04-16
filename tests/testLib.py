@@ -17,7 +17,10 @@ class TestWebKitScreenShot(unittest.TestCase):
     def testMutliScreenShots(self):
         count = 15
         timeout = 3000
-        targets = ['http://www.google.com', 'http://www.themarker.com', 'http://www.ynet.co.il']
+        targets = ['http://www.google.com',
+                   'http://www.themarker.com',
+                   'http://www.ynet.co.il'
+                   ]
         for i in range(count):
             idx = i % len(targets)
             target = targets[idx]
